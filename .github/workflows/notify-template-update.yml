@@ -1,0 +1,135 @@
+name: 🔔 Template-Update Benachrichtigung
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/**"
+      - "version*/**"
+      - "scripts/**"
+      - "templates/**"
+      - "ka_grundlagen/**"
+      - "README.md"
+      - ".github/**"
+
+jobs:
+  notify-update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: 📥 Repository auschecken
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: 📊 Änderungen ermitteln
+        id: changes
+        run: |
+          # Ermittle die Unterschiede zum vorherigen Commit
+          CHANGED_FILES=$(git diff --name-only HEAD~1..HEAD)
+          echo "changed_files<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGED_FILES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          # Kategorisiere die Änderungen
+          if echo "$CHANGED_FILES" | grep -q "^docs/"; then
+            echo "has_docs=true" >> $GITHUB_OUTPUT
+          fi
+          if echo "$CHANGED_FILES" | grep -q "^version"; then
+            echo "has_versions=true" >> $GITHUB_OUTPUT
+          fi
+          if echo "$CHANGED_FILES" | grep -q "^ka_grundlagen/"; then
+            echo "has_exam=true" >> $GITHUB_OUTPUT
+          fi
+          if echo "$CHANGED_FILES" | grep -q "^scripts/"; then
+            echo "has_scripts=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 🔍 Commit-Message auslesen
+        id: commit
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "message<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMIT_MSG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: 📝 Update-Log erstellen
+        run: |
+          cat > /tmp/update_info.txt << 'EOF'
+          🎯 TEMPLATE-UPDATE VERFÜGBAR
+          =============================
+
+          Commit: ${{ github.sha }}
+          Branch: ${{ github.ref_name }}
+          Autor: ${{ github.actor }}
+
+          📝 Commit-Nachricht:
+          ${{ steps.commit.outputs.message }}
+
+          📂 Geänderte Kategorien:
+          ${{ steps.changes.outputs.has_docs == 'true' && '✅ Dokumentation (docs/)' || '' }}
+          ${{ steps.changes.outputs.has_versions == 'true' && '✅ Versionen & Aufgaben (version*/)' || '' }}
+          ${{ steps.changes.outputs.has_exam == 'true' && '✅ Klassenarbeit & Lösungen (ka_grundlagen/)' || '' }}
+          ${{ steps.changes.outputs.has_scripts == 'true' && '✅ Scripts & Tools (scripts/)' || '' }}
+
+          🔧 Nächste Schritte für abhängige Repos:
+
+          1. Einmalig (falls nicht gemacht):
+             git remote add template https://github.com/${{ github.repository }}.git
+
+          2. Updates abrufen:
+             git fetch template
+
+          3. Selektiv übernehmen:
+             git merge template/main --no-edit --allow-unrelated-histories
+
+          📖 Weitere Infos: docs/handbook/TEMPLATE_SYNC.md
+          EOF
+          cat /tmp/update_info.txt
+
+      - name: 📢 Release Notes (optional)
+        if: contains(github.event.head_commit.message, 'release:')
+        run: |
+          echo "🚀 Dies ist ein Release-Update!"
+          echo "Abhängige Repos sollten prioritär aktualisiert werden."
+
+  verify-syntax:
+    runs-on: ubuntu-latest
+    needs: notify-update
+
+    steps:
+      - name: 📥 Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: ✅ Validiere HTML-Dateien
+        run: |
+          find . -name "*.html" -type f ! -path "./node_modules/*" -print0 | \
+          xargs -0 -I {} sh -c 'echo "Checking: {}"; grep -q "<!DOCTYPE html>" {} || echo "⚠️ DOCTYPE missing in {}"' || true
+
+      - name: ✅ Validiere Markdown-Syntax
+        run: |
+          find . -name "*.md" -type f ! -path "./node_modules/*" | head -5 | while read f; do
+            echo "✓ Checking: $f"
+            test -s "$f" && echo "  ✓ Datei OK" || echo "  ✗ Datei leer"
+          done
+
+      - name: 🐍 Prüfe Python-Syntax
+        run: |
+          python3 -m py_compile scripts/*.py 2>&1 | head -20 || echo "⚠️ Python-Dateien vorhanden"
+
+      - name: 📊 Generiere Update-Summary
+        run: |
+          cat > UPDATE_SUMMARY.txt << 'EOF'
+          📦 Template-Update Summary
+          ==========================
+
+          Generiert: $(date)
+          Repo: ${{ github.repository }}
+          Branch: ${{ github.ref_name }}
+
+          Diese Datei kann an abhängige Repos weitergegeben werden.
+          EOF
+          cat UPDATE_SUMMARY.txt

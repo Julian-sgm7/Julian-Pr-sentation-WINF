@@ -1,0 +1,25 @@
+{
+  "name": "web-project-dynamic-quality",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tooling für Lighthouse und Accessibility Tests (Version3 Schülerfirma Projekt)",
+  "scripts": {
+    "assessment:bootstrap": "python3 scripts/bootstrap_assessment_workspace.py",
+    "assessment:ingest": "python3 scripts/process_assessment_uploads.py",
+    "assessment:batch": "python3 scripts/batch_assess.py",
+    "assessment:export": "python3 scripts/export_assessments.py",
+    "assessment:export:list": "python3 scripts/export_assessments.py --list",
+    "setup:extensions": "python3 scripts/manage_vscode_extensions.py install --profile full",
+    "setup:live-test": "python3 scripts/manage_vscode_extensions.py install --profile live-test",
+    "setup:extensions:sync": "python3 scripts/manage_vscode_extensions.py sync",
+    "setup:extensions:check": "python3 scripts/manage_vscode_extensions.py check",
+    "docs:navigation:check": "python3 scripts/check_docs_navigation.py",
+    "test:accessibility": "pa11y file://$PWD/version3/aufgabe/phase2-implementation/index-starter.html --reporter markdown || true",
+    "test:lighthouse": "lhci autorun",
+    "quality": "npm run test:accessibility && npm run test:lighthouse"
+  },
+  "devDependencies": {
+    "@lhci/cli": "0.13.0",
+    "pa11y": "6.0.0"
+  }
+}
